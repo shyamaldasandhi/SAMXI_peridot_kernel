@@ -117,9 +117,7 @@ void a6xx_gmu_set_freq(struct msm_gpu *gpu, struct dev_pm_opp *opp,
 	if (gpu_freq == gmu->freq)
 		return;
 
-	for (perf_index = 0; perf_index < gmu->nr_gpu_freqs - 1; perf_index++)
-		if (gpu_freq == gmu->gpu_freqs[perf_index])
-			break;
+	perf_index = gmu->nr_gpu_freqs - 1;
 
 	gmu->current_perf_index = perf_index;
 	gmu->freq = gmu->gpu_freqs[perf_index];
@@ -646,7 +644,7 @@ static void a6xx_gmu_power_config(struct a6xx_gmu *gmu)
 
 	gmu_write(gmu, REG_A6XX_GMU_PWR_COL_INTER_FRAME_CTRL, 0x9c40400);
 
-	switch (gmu->idle_level) {
+	/* switch (gmu->idle_level) {
 	case GMU_IDLE_STATE_IFPC:
 		gmu_write(gmu, REG_A6XX_GMU_PWR_COL_INTER_FRAME_HYST,
 			GMU_PWR_COL_HYST);
@@ -660,7 +658,7 @@ static void a6xx_gmu_power_config(struct a6xx_gmu *gmu)
 		gmu_rmw(gmu, REG_A6XX_GMU_PWR_COL_INTER_FRAME_CTRL, 0,
 			A6XX_GMU_PWR_COL_INTER_FRAME_CTRL_IFPC_ENABLE |
 			A6XX_GMU_PWR_COL_INTER_FRAME_CTRL_SPTPRAC_POWER_CONTROL_ENABLE);
-	}
+	} */
 
 	/* Enable RPMh GPU client */
 	gmu_rmw(gmu, REG_A6XX_GMU_RPMH_CTRL, 0,
