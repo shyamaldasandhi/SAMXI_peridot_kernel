@@ -84,32 +84,7 @@ static int devfreq_cooling_get_cur_state(struct thermal_cooling_device *cdev,
 static int devfreq_cooling_set_cur_state(struct thermal_cooling_device *cdev,
 					 unsigned long state)
 {
-	struct devfreq_cooling_device *dfc = cdev->devdata;
-	struct devfreq *df = dfc->devfreq;
-	struct device *dev = df->dev.parent;
-	unsigned long freq;
-	int perf_idx;
-
-	if (state == dfc->cooling_state)
-		return 0;
-
-	dev_dbg(dev, "Setting cooling state %lu\n", state);
-
-	if (state > dfc->max_state)
-		return -EINVAL;
-
-	if (dfc->em_pd) {
-		perf_idx = dfc->max_state - state;
-		freq = dfc->em_pd->table[perf_idx].frequency * 1000;
-	} else {
-		freq = dfc->freq_table[state];
-	}
-
-	dev_pm_qos_update_request(&dfc->req_max_freq,
-				  DIV_ROUND_UP(freq, HZ_PER_KHZ));
-
-	dfc->cooling_state = state;
-
+	/* NOP for performance: Ignore all thermal throttling requests */
 	return 0;
 }
 

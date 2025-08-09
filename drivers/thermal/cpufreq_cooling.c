@@ -450,30 +450,8 @@ static int cpufreq_get_cur_state(struct thermal_cooling_device *cdev,
 static int cpufreq_set_cur_state(struct thermal_cooling_device *cdev,
 				 unsigned long state)
 {
-	struct cpufreq_cooling_device *cpufreq_cdev = cdev->devdata;
-	struct cpumask *cpus;
-	unsigned int frequency;
-	int ret;
-
-	/* Request state should be less than max_level */
-	if (state > cpufreq_cdev->max_level)
-		return -EINVAL;
-
-	/* Check if the old cooling action is same as new cooling action */
-	if (cpufreq_cdev->cpufreq_state == state)
-		return 0;
-
-	frequency = get_state_freq(cpufreq_cdev, state);
-
-	ret = freq_qos_update_request(&cpufreq_cdev->qos_req, frequency);
-	if (ret >= 0) {
-		cpufreq_cdev->cpufreq_state = state;
-		cpus = cpufreq_cdev->policy->related_cpus;
-		arch_update_thermal_pressure(cpus, frequency);
-		ret = 0;
-	}
-
-	return ret;
+	/* NOP for performance: Ignore all thermal throttling requests */
+	return 0;
 }
 
 /**
