@@ -228,6 +228,19 @@ config CPU_FREQ_GOV_SCHEDUTIL
 
 	  If in doubt, say N.
 
+config CPU_FREQ_GOV_ALUCARD
+	tristate "'alucard' cpufreq policy governor"
+	depends on CPU_FREQ
+	select CPU_FREQ_GOV_COMMON
+	help
+	  'alucard' - this driver is a modified version of ondemand/pegasusq.
+	  It is tuned for performance and battery life.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpufreq_alucard.
+
+	  If in doubt, say N.
+
 comment "CPU frequency scaling drivers"
 
 config CPUFREQ_DT
