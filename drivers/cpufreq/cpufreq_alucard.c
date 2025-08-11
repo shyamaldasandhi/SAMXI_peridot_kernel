@@ -135,21 +135,9 @@ static ssize_t show_sampling_rate_min(struct cpufreq_policy *policy, char *buf)
         return sprintf(buf, "%u\n", min_sampling_rate);
 }
 
-#define show_one(file_name, object)                                     \
-static ssize_t show_##file_name(struct cpufreq_policy *policy, char *buf)\
-{                                                                       \
-	struct cpu_dbs_info_s *dbs_info = policy->governor_data;		\
-    return sprintf(buf, "%u\n", dbs_info->tuners.object);             \
-}
-show_one(sampling_rate, sampling_rate);
-show_one(io_is_busy, io_is_busy);
-show_one(up_threshold, up_threshold);
-show_one(sampling_down_factor, sampling_down_factor);
-show_one(ignore_nice_load, ignore_nice);
-show_one(down_differential, down_differential);
-show_one(freq_step, freq_step);
-show_one(up_threshold_at_min_freq, up_threshold_at_min_freq);
-show_one(freq_for_responsiveness, freq_for_responsiveness);
+
+
+
 
 static ssize_t store_sampling_rate(struct cpufreq_policy *policy, const char *buf,
                                    size_t count)
@@ -300,16 +288,6 @@ static ssize_t store_freq_for_responsiveness(struct cpufreq_policy *policy,
 	return count;
 }
 
-cpufreq_freq_attr_ro(sampling_rate_min);
-governor_attr_rw(sampling_rate);
-governor_attr_rw(io_is_busy);
-governor_attr_rw(up_threshold);
-governor_attr_rw(sampling_down_factor);
-governor_attr_rw(ignore_nice_load);
-governor_attr_rw(down_differential);
-governor_attr_rw(freq_step);
-governor_attr_rw(up_threshold_at_min_freq);
-governor_attr_rw(freq_for_responsiveness);
 
 static struct attribute *dbs_attributes[] = {
 	&sampling_rate_min.attr,
@@ -329,7 +307,17 @@ static struct attribute_group dbs_attr_group = {
 	.attrs = dbs_attributes,
 	.name = "alucard",
 };
+/************************** sysfs interface ************************/
 
+governor_attr_rw(sampling_rate);
+governor_attr_rw(io_is_busy);
+governor_attr_rw(up_threshold);
+governor_attr_rw(sampling_down_factor);
+governor_attr_rw(ignore_nice_load);
+governor_attr_rw(down_differential);
+governor_attr_rw(freq_step);
+governor_attr_rw(up_threshold_at_min_freq);
+governor_attr_rw(freq_for_responsiveness);
 
 /************************** sysfs end ************************/
 
