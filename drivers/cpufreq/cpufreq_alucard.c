@@ -31,6 +31,7 @@
 #include <linux/suspend.h>
 #include <linux/reboot.h>
 #include <linux/sched/cputime.h>
+#include "cpufreq_governor.h"
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -135,9 +136,11 @@ static ssize_t show_sampling_rate_min(struct cpufreq_policy *policy, char *buf)
         return sprintf(buf, "%u\n", min_sampling_rate);
 }
 
-
-
-
+static ssize_t show_sampling_rate(struct cpufreq_policy *policy, char *buf)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	return sprintf(buf, "%u\n", dbs_info->tuners.sampling_rate);
+}
 
 static ssize_t store_sampling_rate(struct cpufreq_policy *policy, const char *buf,
                                    size_t count)
@@ -155,6 +158,12 @@ static ssize_t store_sampling_rate(struct cpufreq_policy *policy, const char *bu
 	return count;
 }
 
+static ssize_t show_io_is_busy(struct cpufreq_policy *policy, char *buf)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	return sprintf(buf, "%u\n", dbs_info->tuners.io_is_busy);
+}
+
 static ssize_t store_io_is_busy(struct cpufreq_policy *policy, const char *buf,
                                 size_t count)
 {
@@ -169,6 +178,12 @@ static ssize_t store_io_is_busy(struct cpufreq_policy *policy, const char *buf,
 	dbs_info->tuners.io_is_busy = !!input;
 
 	return count;
+}
+
+static ssize_t show_up_threshold(struct cpufreq_policy *policy, char *buf)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	return sprintf(buf, "%u\n", dbs_info->tuners.up_threshold);
 }
 
 static ssize_t store_up_threshold(struct cpufreq_policy *policy, const char *buf,
@@ -188,6 +203,12 @@ static ssize_t store_up_threshold(struct cpufreq_policy *policy, const char *buf
 	return count;
 }
 
+static ssize_t show_sampling_down_factor(struct cpufreq_policy *policy, char *buf)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	return sprintf(buf, "%u\n", dbs_info->tuners.sampling_down_factor);
+}
+
 static ssize_t store_sampling_down_factor(struct cpufreq_policy *policy,
 					  const char *buf, size_t count)
 {
@@ -203,6 +224,12 @@ static ssize_t store_sampling_down_factor(struct cpufreq_policy *policy,
 	dbs_info->rate_mult = 1;
 
 	return count;
+}
+
+static ssize_t show_ignore_nice_load(struct cpufreq_policy *policy, char *buf)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	return sprintf(buf, "%u\n", dbs_info->tuners.ignore_nice);
 }
 
 static ssize_t store_ignore_nice_load(struct cpufreq_policy *policy,
@@ -227,6 +254,12 @@ static ssize_t store_ignore_nice_load(struct cpufreq_policy *policy,
 	return count;
 }
 
+static ssize_t show_down_differential(struct cpufreq_policy *policy, char *buf)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	return sprintf(buf, "%u\n", dbs_info->tuners.down_differential);
+}
+
 static ssize_t store_down_differential(struct cpufreq_policy *policy,
 				    const char *buf, size_t count)
 {
@@ -243,6 +276,12 @@ static ssize_t store_down_differential(struct cpufreq_policy *policy,
 	return count;
 }
 
+static ssize_t show_freq_step(struct cpufreq_policy *policy, char *buf)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	return sprintf(buf, "%u\n", dbs_info->tuners.freq_step);
+}
+
 static ssize_t store_freq_step(struct cpufreq_policy *policy,
 				   const char *buf, size_t count)
 {
@@ -256,6 +295,12 @@ static ssize_t store_freq_step(struct cpufreq_policy *policy,
 
 	dbs_info->tuners.freq_step = min(input, 100u);
 	return count;
+}
+
+static ssize_t show_up_threshold_at_min_freq(struct cpufreq_policy *policy, char *buf)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	return sprintf(buf, "%u\n", dbs_info->tuners.up_threshold_at_min_freq);
 }
 
 static ssize_t store_up_threshold_at_min_freq(struct cpufreq_policy *policy,
@@ -274,6 +319,12 @@ static ssize_t store_up_threshold_at_min_freq(struct cpufreq_policy *policy,
 	return count;
 }
 
+static ssize_t show_freq_for_responsiveness(struct cpufreq_policy *policy, char *buf)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	return sprintf(buf, "%u\n", dbs_info->tuners.freq_for_responsiveness);
+}
+
 static ssize_t store_freq_for_responsiveness(struct cpufreq_policy *policy,
 					   const char *buf, size_t count)
 {
@@ -288,18 +339,28 @@ static ssize_t store_freq_for_responsiveness(struct cpufreq_policy *policy,
 	return count;
 }
 
+cpufreq_governor_attr_ro(sampling_rate_min);
+cpufreq_governor_attr_rw(sampling_rate);
+cpufreq_governor_attr_rw(io_is_busy);
+cpufreq_governor_attr_rw(up_threshold);
+cpufreq_governor_attr_rw(sampling_down_factor);
+cpufreq_governor_attr_rw(ignore_nice_load);
+cpufreq_governor_attr_rw(down_differential);
+cpufreq_governor_attr_rw(freq_step);
+cpufreq_governor_attr_rw(up_threshold_at_min_freq);
+cpufreq_governor_attr_rw(freq_for_responsiveness);
 
 static struct attribute *dbs_attributes[] = {
-	&sampling_rate_min.attr,
-	&sampling_rate.attr,
-	&up_threshold.attr,
-	&sampling_down_factor.attr,
-	&ignore_nice_load.attr,
-	&io_is_busy.attr,
-	&down_differential.attr,
-	&freq_step.attr,
-	&up_threshold_at_min_freq.attr,
-	&freq_for_responsiveness.attr,
+	&sampling_rate_min_attr.attr,
+	&sampling_rate_attr.attr,
+	&up_threshold_attr.attr,
+	&sampling_down_factor_attr.attr,
+	&ignore_nice_load_attr.attr,
+	&io_is_busy_attr.attr,
+	&down_differential_attr.attr,
+	&freq_step_attr.attr,
+	&up_threshold_at_min_freq_attr.attr,
+	&freq_for_responsiveness_attr.attr,
 	NULL
 };
 
@@ -307,17 +368,6 @@ static struct attribute_group dbs_attr_group = {
 	.attrs = dbs_attributes,
 	.name = "alucard",
 };
-/************************** sysfs interface ************************/
-
-governor_attr_rw(sampling_rate);
-governor_attr_rw(io_is_busy);
-governor_attr_rw(up_threshold);
-governor_attr_rw(sampling_down_factor);
-governor_attr_rw(ignore_nice_load);
-governor_attr_rw(down_differential);
-governor_attr_rw(freq_step);
-governor_attr_rw(up_threshold_at_min_freq);
-governor_attr_rw(freq_for_responsiveness);
 
 /************************** sysfs end ************************/
 
