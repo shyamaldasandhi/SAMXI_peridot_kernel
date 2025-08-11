@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/suspend.h>
 #include <linux/reboot.h>
+#include <linux/sched/cputime.h>
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -67,6 +68,12 @@ static unsigned int min_sampling_rate;
 static void do_dbs_timer(struct work_struct *work);
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
                                 unsigned int event);
+
+static int alucard_init(struct cpufreq_policy *policy);
+static void alucard_exit(struct cpufreq_policy *policy);
+static int alucard_start(struct cpufreq_policy *policy);
+static void alucard_stop(struct cpufreq_policy *policy);
+static void alucard_limits(struct cpufreq_policy *policy);
 
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_ALUCARD
 static
@@ -122,6 +129,206 @@ static DEFINE_PER_CPU(struct cpu_dbs_info_s, od_cpu_dbs_info);
 
 
 /************************** sysfs interface ************************/
+
+static ssize_t show_sampling_rate_min(struct cpufreq_policy *policy, char *buf)
+{
+        return sprintf(buf, "%u\n", min_sampling_rate);
+}
+
+#define show_one(file_name, object)                                     \
+static ssize_t show_##file_name(struct cpufreq_policy *policy, char *buf)\
+{                                                                       \
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;		\
+    return sprintf(buf, "%u\n", dbs_info->tuners.object);             \
+}
+show_one(sampling_rate, sampling_rate);
+show_one(io_is_busy, io_is_busy);
+show_one(up_threshold, up_threshold);
+show_one(sampling_down_factor, sampling_down_factor);
+show_one(ignore_nice_load, ignore_nice);
+show_one(down_differential, down_differential);
+show_one(freq_step, freq_step);
+show_one(up_threshold_at_min_freq, up_threshold_at_min_freq);
+show_one(freq_for_responsiveness, freq_for_responsiveness);
+
+static ssize_t store_sampling_rate(struct cpufreq_policy *policy, const char *buf,
+                                   size_t count)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	dbs_info->tuners.sampling_rate = max(input, min_sampling_rate);
+
+	return count;
+}
+
+static ssize_t store_io_is_busy(struct cpufreq_policy *policy, const char *buf,
+                                size_t count)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	dbs_info->tuners.io_is_busy = !!input;
+
+	return count;
+}
+
+static ssize_t store_up_threshold(struct cpufreq_policy *policy, const char *buf,
+                                  size_t count)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1 || input > MAX_FREQUENCY_UP_THRESHOLD ||
+			input < MIN_FREQUENCY_UP_THRESHOLD) {
+		return -EINVAL;
+	}
+	dbs_info->tuners.up_threshold = input;
+
+	return count;
+}
+
+static ssize_t store_sampling_down_factor(struct cpufreq_policy *policy,
+					  const char *buf, size_t count)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1 || input > MAX_SAMPLING_DOWN_FACTOR || input < 1)
+		return -EINVAL;
+
+	dbs_info->tuners.sampling_down_factor = input;
+	dbs_info->rate_mult = 1;
+
+	return count;
+}
+
+static ssize_t store_ignore_nice_load(struct cpufreq_policy *policy,
+				      const char *buf, size_t count)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	if (input > 1)
+		input = 1;
+
+	if (input == dbs_info->tuners.ignore_nice)
+		return count;
+
+	dbs_info->tuners.ignore_nice = input;
+
+	return count;
+}
+
+static ssize_t store_down_differential(struct cpufreq_policy *policy,
+				    const char *buf, size_t count)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	dbs_info->tuners.down_differential = min(input, 100u);
+
+	return count;
+}
+
+static ssize_t store_freq_step(struct cpufreq_policy *policy,
+				   const char *buf, size_t count)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	dbs_info->tuners.freq_step = min(input, 100u);
+	return count;
+}
+
+static ssize_t store_up_threshold_at_min_freq(struct cpufreq_policy *policy,
+					   const char *buf, size_t count)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1 || input > MAX_FREQUENCY_UP_THRESHOLD ||
+	    input < MIN_FREQUENCY_UP_THRESHOLD) {
+		return -EINVAL;
+	}
+	dbs_info->tuners.up_threshold_at_min_freq = input;
+	return count;
+}
+
+static ssize_t store_freq_for_responsiveness(struct cpufreq_policy *policy,
+					   const char *buf, size_t count)
+{
+	struct cpu_dbs_info_s *dbs_info = policy->governor_data;
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_info->tuners.freq_for_responsiveness = input;
+	return count;
+}
+
+cpufreq_freq_attr_ro(sampling_rate_min);
+governor_attr_rw(sampling_rate);
+governor_attr_rw(io_is_busy);
+governor_attr_rw(up_threshold);
+governor_attr_rw(sampling_down_factor);
+governor_attr_rw(ignore_nice_load);
+governor_attr_rw(down_differential);
+governor_attr_rw(freq_step);
+governor_attr_rw(up_threshold_at_min_freq);
+governor_attr_rw(freq_for_responsiveness);
+
+static struct attribute *dbs_attributes[] = {
+	&sampling_rate_min.attr,
+	&sampling_rate.attr,
+	&up_threshold.attr,
+	&sampling_down_factor.attr,
+	&ignore_nice_load.attr,
+	&io_is_busy.attr,
+	&down_differential.attr,
+	&freq_step.attr,
+	&up_threshold_at_min_freq.attr,
+	&freq_for_responsiveness.attr,
+	NULL
+};
+
+static struct attribute_group dbs_attr_group = {
+	.attrs = dbs_attributes,
+	.name = "alucard",
+};
 
 
 /************************** sysfs end ************************/
@@ -184,7 +391,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
                                          j_dbs_info->prev_cpu_nice;
 
                         j_dbs_info->prev_cpu_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-                        idle_time += cputime_to_usecs(cur_nice);
+                        idle_time += cputime64_to_usecs(cur_nice);
                 }
 
                 if (this_dbs_info->tuners.io_is_busy && idle_time >= iowait_time)
